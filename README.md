@@ -2,6 +2,20 @@
 
 CLI tool to automatically generate text descriptions for images using Ollama vision models (LLaVA, Qwen3-VL, Llama Vision).
 
+## Prerequisites
+
+- **Python 3.10+**
+- **[uv](https://docs.astral.sh/uv/)** - Python package manager
+- **[Ollama](https://ollama.com/)** - Must be installed separately and running
+
+### Installing Ollama
+
+Download and install Ollama from [ollama.com](https://ollama.com/), then pull a vision model:
+
+```bash
+ollama pull qwen3-vl:8b
+```
+
 ## Installation
 
 ```bash
@@ -9,9 +23,11 @@ CLI tool to automatically generate text descriptions for images using Ollama vis
 git clone https://github.com/hydropix/ollama-image-describer.git
 cd ollama-image-describer
 
-# Install dependencies with uv
+# Install Python dependencies with uv
 uv sync
 ```
+
+> **Note:** `uv sync` installs the Python dependencies (including the `ollama` Python client library). The Ollama server itself must be installed separately as described above.
 
 ## Configuration
 
