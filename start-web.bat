@@ -7,22 +7,29 @@ echo.
 cd /d "%~dp0"
 
 echo [1/4] Checking if UV is installed...
-where uv >nul 2>nul
-if %errorlevel% neq 0 (
-    echo UV not found. Installing UV...
-    powershell -ExecutionPolicy ByPass -NoProfile -Command "irm https://astral.sh/uv/install.ps1 | iex"
-    if %errorlevel% neq 0 (
-        echo ERROR: Failed to install UV.
-        pause
-        exit /b 1
-    )
-    echo UV installed successfully!
-    echo Please restart this script for the changes to take effect.
-    pause
-    exit /b 0
-) else (
-    echo UV is already installed.
-)
+where uv >nul 2>nul && goto :uv_found
+
+echo UV not found. Installing UV...
+powershell -ExecutionPolicy ByPass -NoProfile -Command "irm https://astral.sh/uv/install.ps1 | iex"
+
+REM Add UV to PATH for current session
+set "Path=%USERPROFILE%\.local\bin;%Path%"
+
+REM Verify UV is now available
+where uv >nul 2>nul && goto :uv_installed
+echo ERROR: UV installation failed or not found in PATH.
+echo Please restart your terminal and run this script again.
+pause
+exit /b 1
+
+:uv_installed
+echo UV installed successfully!
+goto :uv_continue
+
+:uv_found
+echo UV is already installed.
+
+:uv_continue
 
 echo.
 echo [2/4] Updating repository...
