@@ -2,8 +2,6 @@
   <img src="assets/logo.png" width="400" height="400" alt="ollama-image-describer logo">
 </p>
 
-# ollama-image-describer
-
 Tool to automatically generate text descriptions (captions) for images using Ollama vision models (LLaVA, Qwen3-VL, Llama Vision). Available as a **web application** (recommended) or **CLI**.
 
 **Key feature:** Fully customizable system prompts to precisely control the output format. Includes built-in presets optimized for Stable Diffusion (with parentheses weight syntax), Z-Image/Midjourney (detailed structured descriptions), Flux, and more.
