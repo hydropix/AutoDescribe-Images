@@ -11,10 +11,8 @@ Tool to automatically generate text descriptions (captions) for images using Oll
 **Perfect for AI image generation training!** This tool is designed to help you create caption files for training LoRA (Low-Rank Adaptation) models on image generation AI like Stable Diffusion, Flux, Z-Image, or other diffusion models.
 
 When training a LoRA, each image in your dataset needs an accompanying `.txt` file with a description. This tool automates that process by:
-- Analyzing each image with a vision AI model
+- Analysis of each image using a visual AI model, with your personalized instructions in natural language
 - Generating detailed, consistent descriptions tailored to your target model
-- Saving them as `.txt` files alongside your images
-- Optionally adding a prefix/suffix (like artist name or style trigger word)
 
 ## Prerequisites
 
