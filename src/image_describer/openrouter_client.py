@@ -12,20 +12,42 @@ logger = logging.getLogger(__name__)
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Popular vision models on OpenRouter
-OPENROUTER_VISION_MODELS = [
-    "openai/gpt-4o",
-    "openai/gpt-4o-mini",
-    "openai/chatgpt-4o-latest",
-    "anthropic/claude-sonnet-4",
-    "anthropic/claude-3.5-sonnet",
+# Session cost tracking
+_session_cost = 0.0
+_session_tokens = {"prompt": 0, "completion": 0}
+
+
+def get_session_cost() -> tuple[float, dict[str, int]]:
+    """Get the current session cost and token usage.
+
+    Returns:
+        Tuple of (total_cost_usd, token_counts_dict)
+    """
+    return _session_cost, _session_tokens.copy()
+
+
+def reset_session_cost() -> None:
+    """Reset the session cost tracking."""
+    global _session_cost, _session_tokens
+    _session_cost = 0.0
+    _session_tokens = {"prompt": 0, "completion": 0}
+
+# Fallback vision models (sorted by cost, cheapest first)
+OPENROUTER_VISION_MODELS_FALLBACK = [
+    # === CHEAP MODELS ===
     "google/gemini-2.0-flash-001",
-    "google/gemini-pro-vision",
-    "qwen/qwen2.5-vl-72b-instruct",
-    "qwen/qwen2.5-vl-32b-instruct",
-    "qwen/qwen-vl-max",
-    "meta-llama/llama-3.2-90b-vision-instruct",
+    "google/gemini-2.5-flash-preview",
     "meta-llama/llama-3.2-11b-vision-instruct",
+    "qwen/qwen2.5-vl-32b-instruct",
+    "openai/gpt-4o-mini",
+    "qwen/qwen2.5-vl-72b-instruct",
+    "meta-llama/llama-3.2-90b-vision-instruct",
+    # === PREMIUM MODELS ===
+    "google/gemini-pro-vision",
+    "qwen/qwen-vl-max",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-sonnet-4",
+    "openai/gpt-4o",
 ]
 
 
@@ -133,23 +155,46 @@ def describe_image(
         raise ValueError(f"Unexpected response format: {result}")
 
     response_content = result['choices'][0]['message']['content']
-    logger.info(f"Response received in {api_time:.2f}s (length: {len(response_content)} chars)")
+
+    # Track cost from usage data
+    global _session_cost, _session_tokens
+    usage = result.get("usage", {})
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+
+    # OpenRouter returns cost in the response (in USD)
+    # If not available, estimate from token counts (rough estimate)
+    if "cost" in result:
+        cost = float(result.get("cost", 0))
+    else:
+        # Fallback: estimate cost (Gemini Flash rates as default)
+        # $0.10/M input, $0.40/M output
+        cost = (prompt_tokens * 0.10 / 1_000_000) + (completion_tokens * 0.40 / 1_000_000)
+
+    _session_cost += cost
+    _session_tokens["prompt"] += prompt_tokens
+    _session_tokens["completion"] += completion_tokens
+
+    logger.info(
+        f"Response received in {api_time:.2f}s (length: {len(response_content)} chars) | "
+        f"Tokens: {prompt_tokens}+{completion_tokens} | Cost: ${cost:.6f} (session: ${_session_cost:.4f})"
+    )
     logger.debug(f"Response preview: {response_content[:100]}...")
 
     return response_content
 
 
 def list_openrouter_models(api_key: str | None = None) -> list[str]:
-    """List available OpenRouter vision models.
+    """List available OpenRouter vision models, sorted by price (cheapest first).
 
     Args:
         api_key: OpenRouter API key (optional, uses default list if not provided).
 
     Returns:
-        List of model names.
+        List of model names sorted by price (free models first, then by cost).
     """
     if not api_key:
-        return OPENROUTER_VISION_MODELS
+        return OPENROUTER_VISION_MODELS_FALLBACK
 
     try:
         headers = {
@@ -170,14 +215,24 @@ def list_openrouter_models(api_key: str | None = None) -> list[str]:
             # Include models known to support vision or with vision in architecture
             architecture = model.get("architecture", {})
             if architecture.get("modality") == "multimodal" or "vision" in model_id.lower():
-                vision_models.append(model_id)
+                # Get pricing info (price per token)
+                pricing = model.get("pricing", {})
+                # Use prompt price as main cost indicator
+                prompt_price = float(pricing.get("prompt", "999") or "999")
+                completion_price = float(pricing.get("completion", "999") or "999")
+                total_price = prompt_price + completion_price
+                vision_models.append((model_id, total_price))
 
-        # If filtering didn't work well, return popular ones
+        # If filtering didn't work well, return fallback
         if len(vision_models) < 5:
-            return OPENROUTER_VISION_MODELS
+            return OPENROUTER_VISION_MODELS_FALLBACK
 
-        return sorted(vision_models)
+        # Sort by price (cheapest first, free models at top)
+        vision_models.sort(key=lambda x: x[1])
+
+        # Return just the model names
+        return [model_id for model_id, _ in vision_models]
 
     except Exception as e:
         logger.warning(f"Failed to fetch OpenRouter models: {e}")
-        return OPENROUTER_VISION_MODELS
+        return OPENROUTER_VISION_MODELS_FALLBACK

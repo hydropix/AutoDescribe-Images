@@ -18,7 +18,12 @@ from .config import (
     load_user_preferences,
     save_user_preferences,
 )
-from .openrouter_client import OPENROUTER_VISION_MODELS
+from .openrouter_client import (
+    list_openrouter_models,
+    OPENROUTER_VISION_MODELS_FALLBACK,
+    get_session_cost,
+    reset_session_cost,
+)
 from .processor import find_images, process_images_generator
 
 
@@ -113,12 +118,13 @@ def create_app() -> gr.Blocks:
                 type="password",
             )
             openrouter_model = gr.Dropdown(
-                label="OpenRouter Model",
-                choices=OPENROUTER_VISION_MODELS,
-                value=user_prefs.openrouter_model if user_prefs.openrouter_model else "openai/gpt-4o-mini",
+                label="OpenRouter Model (sorted by price, cheapest first)",
+                choices=OPENROUTER_VISION_MODELS_FALLBACK,
+                value=user_prefs.openrouter_model if user_prefs.openrouter_model else "google/gemini-2.0-flash-001",
                 allow_custom_value=True,
-                info="Select a vision-capable model",
+                info="Vision models sorted by cost - cheapest at top",
             )
+            refresh_openrouter_btn = gr.Button("🔄 Refresh Models (fetch prices)", size="sm")
             gr.HTML(
                 '<p style="font-size: 0.85em; color: #888; margin: 4px 0 8px 0; text-align: center;">'
                 '<a href="https://openrouter.ai/models?supported_parameters=vision" target="_blank" '
@@ -354,6 +360,11 @@ def create_app() -> gr.Blocks:
                 return
 
             provider_name = "OpenRouter" if provider == "openrouter" else "Ollama"
+
+            # Reset cost tracking for OpenRouter
+            if provider == "openrouter":
+                reset_session_cost()
+
             # Yield initial state: disable start, enable stop
             yield (
                 f"Starting with {provider_name}... Found {len(images)} images",
@@ -377,8 +388,12 @@ def create_app() -> gr.Blocks:
             ):
                 # Check if stop was requested
                 if _stop_event.is_set():
+                    stop_status = f"Stopped! {processed_count} processed, {skipped_count} skipped"
+                    if provider == "openrouter":
+                        cost, tokens = get_session_cost()
+                        stop_status += f" | Cost: ${cost:.4f} ({tokens['prompt']}+{tokens['completion']} tokens)"
                     yield (
-                        f"Stopped! {processed_count} processed, {skipped_count} skipped",
+                        stop_status,
                         gr.update(interactive=True),  # Re-enable start
                         gr.update(interactive=False, value="Stop"),  # Disable stop
                         False,
@@ -413,8 +428,14 @@ def create_app() -> gr.Blocks:
                     True,
                 )
 
+            # Build final status with cost info for OpenRouter
+            final_status = f"Done! {processed_count} processed, {skipped_count} skipped"
+            if provider == "openrouter":
+                cost, tokens = get_session_cost()
+                final_status += f" | Cost: ${cost:.4f} ({tokens['prompt']}+{tokens['completion']} tokens)"
+
             yield (
-                f"Done! {processed_count} processed, {skipped_count} skipped",
+                final_status,
                 gr.update(interactive=True),  # Re-enable start
                 gr.update(interactive=False, value="Stop"),  # Disable stop
                 False,
@@ -430,6 +451,18 @@ def create_app() -> gr.Blocks:
             fn=refresh_models,
             inputs=[ollama_host_input],
             outputs=[model_dropdown],
+        )
+
+        def refresh_openrouter_models(api_key: str):
+            """Refresh OpenRouter models list sorted by price."""
+            models = list_openrouter_models(api_key)
+            current_value = models[0] if models else None
+            return gr.update(choices=models, value=current_value)
+
+        refresh_openrouter_btn.click(
+            fn=refresh_openrouter_models,
+            inputs=[openrouter_api_key],
+            outputs=[openrouter_model],
         )
 
         # Auto-connect on load
