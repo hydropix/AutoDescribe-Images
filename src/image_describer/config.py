@@ -9,7 +9,9 @@ import yaml
 from dotenv import load_dotenv
 from ollama import Client
 
-load_dotenv()
+# Load .env from config directory
+ENV_FILE = Path(__file__).parent.parent.parent / "config" / ".env"
+load_dotenv(ENV_FILE)
 
 # User preferences file location (in config directory)
 USER_PREFS_FILE = Path(__file__).parent.parent.parent / "config" / "user_preferences.json"
