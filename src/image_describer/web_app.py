@@ -12,6 +12,7 @@ import gradio as gr
 from .config import (
     Config,
     UserPreferences,
+    get_openrouter_api_key,
     list_ollama_models,
     load_presets,
     load_user_preferences,
@@ -106,9 +107,9 @@ def create_app() -> gr.Blocks:
         with gr.Group(visible=(user_prefs.provider == "openrouter")) as openrouter_group:
             openrouter_api_key = gr.Textbox(
                 label="OpenRouter API Key",
-                value=user_prefs.openrouter_api_key,
+                value=get_openrouter_api_key(),
                 placeholder="sk-or-v1-...",
-                info="Get your API key from openrouter.ai",
+                info="Set OPENROUTER_API_KEY in .env or enter here for this session",
                 type="password",
             )
             openrouter_model = gr.Dropdown(
@@ -316,7 +317,7 @@ def create_app() -> gr.Blocks:
             # Determine which model to use based on provider
             model = or_model if provider == "openrouter" else ollama_model
 
-            # Save user preferences for next session
+            # Save user preferences for next session (API key not saved for security)
             save_user_preferences(UserPreferences(
                 image_folder=folder_path,
                 ollama_model=ollama_model or "",
@@ -326,7 +327,6 @@ def create_app() -> gr.Blocks:
                 temperature=temperature,
                 overwrite=overwrite,
                 provider=provider,
-                openrouter_api_key=or_api_key or "",
                 openrouter_model=or_model or "",
                 custom_prompt=custom_prompt or "",
             ))

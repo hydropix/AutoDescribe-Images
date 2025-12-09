@@ -26,11 +26,19 @@ class UserPreferences:
     suffix: str = ""
     temperature: float = 0.7
     overwrite: bool = True
-    # OpenRouter settings
+    # OpenRouter settings (API key loaded from environment, not persisted here)
     provider: str = "ollama"  # "ollama" or "openrouter"
-    openrouter_api_key: str = ""
     openrouter_model: str = "openai/gpt-4o-mini"
     custom_prompt: str = ""  # Additional text appended to the preset prompt
+
+
+def get_openrouter_api_key() -> str:
+    """Get OpenRouter API key from environment variable.
+
+    Returns:
+        The API key from OPENROUTER_API_KEY env var, or empty string if not set.
+    """
+    return os.getenv("OPENROUTER_API_KEY", "")
 
 
 def load_user_preferences() -> UserPreferences:
@@ -52,7 +60,6 @@ def load_user_preferences() -> UserPreferences:
                 temperature=data.get("temperature", 0.7),
                 overwrite=data.get("overwrite", True),
                 provider=data.get("provider", "ollama"),
-                openrouter_api_key=data.get("openrouter_api_key", ""),
                 openrouter_model=data.get("openrouter_model", "openai/gpt-4o-mini"),
                 custom_prompt=data.get("custom_prompt", ""),
             )
@@ -76,7 +83,6 @@ def save_user_preferences(prefs: UserPreferences) -> None:
         "temperature": prefs.temperature,
         "overwrite": prefs.overwrite,
         "provider": prefs.provider,
-        "openrouter_api_key": prefs.openrouter_api_key,
         "openrouter_model": prefs.openrouter_model,
         "custom_prompt": prefs.custom_prompt,
     }
