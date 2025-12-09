@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Callable
 
 from .config import Config
-from .ollama_client import describe_image
+from .ollama_client import describe_image as ollama_describe_image
+from .openrouter_client import describe_image as openrouter_describe_image
 
 logger = logging.getLogger(__name__)
 
@@ -93,14 +94,23 @@ def process_images(
         image_start = time.time()
 
         try:
-            description = describe_image(
-                image_path=image_path,
-                model=config.model,
-                system_prompt=config.system_prompt,
-                temperature=config.temperature,
-                num_ctx=config.num_ctx,
-                ollama_host=config.ollama_host,
-            )
+            if config.provider == "openrouter":
+                description = openrouter_describe_image(
+                    image_path=image_path,
+                    model=config.model,
+                    system_prompt=config.system_prompt,
+                    api_key=config.openrouter_api_key,
+                    temperature=config.temperature,
+                )
+            else:
+                description = ollama_describe_image(
+                    image_path=image_path,
+                    model=config.model,
+                    system_prompt=config.system_prompt,
+                    temperature=config.temperature,
+                    num_ctx=config.num_ctx,
+                    ollama_host=config.ollama_host,
+                )
 
             image_time = time.time() - image_start
             logger.info(f"[{i}/{total}] Completed in {image_time:.2f}s: {image_path.name}")
@@ -175,14 +185,23 @@ def process_images_generator(
             continue
 
         try:
-            description = describe_image(
-                image_path=image_path,
-                model=config.model,
-                system_prompt=config.system_prompt,
-                temperature=config.temperature,
-                num_ctx=config.num_ctx,
-                ollama_host=config.ollama_host,
-            )
+            if config.provider == "openrouter":
+                description = openrouter_describe_image(
+                    image_path=image_path,
+                    model=config.model,
+                    system_prompt=config.system_prompt,
+                    api_key=config.openrouter_api_key,
+                    temperature=config.temperature,
+                )
+            else:
+                description = ollama_describe_image(
+                    image_path=image_path,
+                    model=config.model,
+                    system_prompt=config.system_prompt,
+                    temperature=config.temperature,
+                    num_ctx=config.num_ctx,
+                    ollama_host=config.ollama_host,
+                )
 
             # Check again after API call (in case stop was requested during processing)
             if stop_event and stop_event.is_set():

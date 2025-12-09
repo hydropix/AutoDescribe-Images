@@ -26,6 +26,11 @@ class UserPreferences:
     suffix: str = ""
     temperature: float = 0.7
     overwrite: bool = True
+    # OpenRouter settings
+    provider: str = "ollama"  # "ollama" or "openrouter"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openai/gpt-4o-mini"
+    custom_prompt: str = ""  # Additional text appended to the preset prompt
 
 
 def load_user_preferences() -> UserPreferences:
@@ -46,6 +51,10 @@ def load_user_preferences() -> UserPreferences:
                 suffix=data.get("suffix", ""),
                 temperature=data.get("temperature", 0.7),
                 overwrite=data.get("overwrite", True),
+                provider=data.get("provider", "ollama"),
+                openrouter_api_key=data.get("openrouter_api_key", ""),
+                openrouter_model=data.get("openrouter_model", "openai/gpt-4o-mini"),
+                custom_prompt=data.get("custom_prompt", ""),
             )
         except (json.JSONDecodeError, KeyError):
             pass
@@ -66,6 +75,10 @@ def save_user_preferences(prefs: UserPreferences) -> None:
         "suffix": prefs.suffix,
         "temperature": prefs.temperature,
         "overwrite": prefs.overwrite,
+        "provider": prefs.provider,
+        "openrouter_api_key": prefs.openrouter_api_key,
+        "openrouter_model": prefs.openrouter_model,
+        "custom_prompt": prefs.custom_prompt,
     }
     with open(USER_PREFS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -96,6 +109,9 @@ class Config:
     description_suffix: str = ""
     description_prefix: str = ""
     markdown_format: bool = False
+    # OpenRouter settings
+    provider: str = "ollama"  # "ollama" or "openrouter"
+    openrouter_api_key: str = ""
 
 
 def load_presets(config_path: Path | None = None) -> list[PromptPreset]:
