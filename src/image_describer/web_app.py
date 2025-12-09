@@ -12,11 +12,13 @@ import gradio as gr
 from .config import (
     Config,
     UserPreferences,
+    get_openrouter_api_key,
     list_ollama_models,
     load_presets,
     load_user_preferences,
     save_user_preferences,
 )
+from .openrouter_client import OPENROUTER_VISION_MODELS
 from .processor import find_images, process_images_generator
 
 
@@ -63,12 +65,21 @@ def create_app() -> gr.Blocks:
         gr.HTML(
             f'<div style="display: flex; justify-content: center;"><img src="data:image/png;base64,{logo_base64}"></div>'
         )
-        gr.Markdown("Generate image descriptions using Ollama Vision models.")
-        connection_status = gr.HTML(
-            value="<span style='color: gray;'>[Disconnected]</span>",
+        gr.Markdown("Generate image descriptions using Ollama Vision models or OpenRouter API.")
+
+        # Provider Selection
+        provider_radio = gr.Radio(
+            choices=[("Ollama (Local)", "ollama"), ("OpenRouter (Cloud)", "openrouter")],
+            value=user_prefs.provider,
+            label="Provider",
+            info="Choose between local Ollama or cloud-based OpenRouter",
         )
 
-        with gr.Group():
+        # Ollama Settings Group
+        with gr.Group(visible=(user_prefs.provider == "ollama")) as ollama_group:
+            connection_status = gr.HTML(
+                value="<span style='color: gray;'>[Disconnected]</span>",
+            )
             ollama_host_input = gr.Textbox(
                 label="Ollama API",
                 value=get_ollama_host(),
@@ -77,15 +88,6 @@ def create_app() -> gr.Blocks:
             )
             connect_btn = gr.Button("🔄 Test Connection", size="sm")
 
-        folder_input = gr.Textbox(
-            label="Image Folder",
-            value=user_prefs.image_folder,
-            placeholder="Enter path to folder containing images...",
-            info="Path to the folder with images to process",
-            lines=2,
-        )
-
-        with gr.Group():
             model_dropdown = gr.Dropdown(
                 label="Ollama Model",
                 choices=[],
@@ -101,11 +103,50 @@ def create_app() -> gr.Blocks:
                 '</p>'
             )
 
+        # OpenRouter Settings Group
+        with gr.Group(visible=(user_prefs.provider == "openrouter")) as openrouter_group:
+            openrouter_api_key = gr.Textbox(
+                label="OpenRouter API Key",
+                value=get_openrouter_api_key(),
+                placeholder="sk-or-v1-...",
+                info="Set OPENROUTER_API_KEY in .env or enter here for this session",
+                type="password",
+            )
+            openrouter_model = gr.Dropdown(
+                label="OpenRouter Model",
+                choices=OPENROUTER_VISION_MODELS,
+                value=user_prefs.openrouter_model if user_prefs.openrouter_model else "openai/gpt-4o-mini",
+                allow_custom_value=True,
+                info="Select a vision-capable model",
+            )
+            gr.HTML(
+                '<p style="font-size: 0.85em; color: #888; margin: 4px 0 8px 0; text-align: center;">'
+                '<a href="https://openrouter.ai/models?supported_parameters=vision" target="_blank" '
+                'style="color: #58a6ff; text-decoration: none;">Browse all vision models on OpenRouter ↗</a>'
+                '</p>'
+            )
+
+        folder_input = gr.Textbox(
+            label="Image Folder",
+            value=user_prefs.image_folder,
+            placeholder="Enter path to folder containing images...",
+            info="Path to the folder with images to process",
+            lines=2,
+        )
+
         preset_dropdown = gr.Dropdown(
             label="Prompt Preset",
             choices=preset_choices,
             value=default_preset,
             info="Select a prompt preset for your use case. You can add or edit presets in config.yaml",
+        )
+
+        custom_prompt_input = gr.Textbox(
+            label="Custom Prompt (Appended)",
+            value=user_prefs.custom_prompt if hasattr(user_prefs, 'custom_prompt') else "",
+            placeholder="Add custom instructions here... These will be appended to the preset prompt.",
+            info="Additional instructions appended to the selected preset prompt",
+            lines=4,
         )
 
         temperature_slider = gr.Slider(
@@ -152,7 +193,18 @@ def create_app() -> gr.Blocks:
             interactive=False,
         )
 
+        # Provider toggle handler
+        def on_provider_change(provider):
+            return (
+                gr.update(visible=(provider == "ollama")),
+                gr.update(visible=(provider == "openrouter")),
+            )
 
+        provider_radio.change(
+            fn=on_provider_change,
+            inputs=[provider_radio],
+            outputs=[ollama_group, openrouter_group],
+        )
 
         def check_connection(host: str):
             """Check connection to Ollama and refresh models list."""
@@ -199,10 +251,14 @@ def create_app() -> gr.Blocks:
             )
 
         def process_folder(
+            provider: str,
             folder_path: str,
             ollama_host: str,
-            model: str,
+            ollama_model: str,
+            or_api_key: str,
+            or_model: str,
             preset_key: str,
+            custom_prompt: str,
             temperature: float,
             prefix: str,
             suffix: str,
@@ -241,18 +297,38 @@ def create_app() -> gr.Blocks:
                 )
                 return
 
+            # Validate OpenRouter settings
+            if provider == "openrouter" and not or_api_key:
+                yield (
+                    "Error: OpenRouter API key is required",
+                    gr.update(interactive=True),
+                    gr.update(interactive=False, value="Stop"),
+                    False,
+                )
+                return
+
             system_prompt = preset_prompts.get(preset_key, "Describe this image.")
             markdown_format = preset_markdown_format.get(preset_key, False)
+            
+            # Append custom prompt if provided
+            if custom_prompt and custom_prompt.strip():
+                system_prompt = system_prompt + "\n\n" + custom_prompt.strip()
 
-            # Save user preferences for next session
+            # Determine which model to use based on provider
+            model = or_model if provider == "openrouter" else ollama_model
+
+            # Save user preferences for next session (API key not saved for security)
             save_user_preferences(UserPreferences(
                 image_folder=folder_path,
-                ollama_model=model or "",
+                ollama_model=ollama_model or "",
                 preset_key=preset_key or "",
                 prefix=prefix or "",
                 suffix=suffix or "",
                 temperature=temperature,
                 overwrite=overwrite,
+                provider=provider,
+                openrouter_model=or_model or "",
+                custom_prompt=custom_prompt or "",
             ))
 
             config = Config(
@@ -263,6 +339,8 @@ def create_app() -> gr.Blocks:
                 description_prefix=prefix,
                 description_suffix=suffix,
                 markdown_format=markdown_format,
+                provider=provider,
+                openrouter_api_key=or_api_key or "",
             )
 
             images = find_images(folder, config.supported_extensions)
@@ -275,9 +353,10 @@ def create_app() -> gr.Blocks:
                 )
                 return
 
+            provider_name = "OpenRouter" if provider == "openrouter" else "Ollama"
             # Yield initial state: disable start, enable stop
             yield (
-                f"Starting... Found {len(images)} images",
+                f"Starting with {provider_name}... Found {len(images)} images",
                 gr.update(interactive=False),  # Disable start button
                 gr.update(interactive=True, value="Stop"),  # Enable stop button
                 True,
@@ -363,10 +442,14 @@ def create_app() -> gr.Blocks:
         process_btn.click(
             fn=process_folder,
             inputs=[
+                provider_radio,
                 folder_input,
                 ollama_host_input,
                 model_dropdown,
+                openrouter_api_key,
+                openrouter_model,
                 preset_dropdown,
+                custom_prompt_input,
                 temperature_slider,
                 prefix_input,
                 suffix_input,
@@ -407,12 +490,13 @@ def create_app() -> gr.Blocks:
 def launch_web_app():
     """Launch the Gradio web application."""
     app = create_app()
+    port = int(os.getenv("GRADIO_SERVER_PORT", "7861"))
     app.launch(
         server_name="127.0.0.1",
-        server_port=7860,
+        server_port=port,
         share=False,
         inbrowser=True,
-        allowed_paths=["/", "C:\\", "D:\\", "E:\\", "Z:\\"],
+        allowed_paths=["/", "C:\\", "D:\\", "E:\\", "Z:\\", "Q:\\"],
     )
 
 
