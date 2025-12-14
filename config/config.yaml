@@ -87,6 +87,61 @@ prompts:
       elegant black dress, standing in flower field, soft golden hour lighting, (bokeh:1.1),
       depth of field, vibrant colors, digital painting style, highly detailed
 
+  style_focus:
+    name: "Style Focus"
+    markdownFormat: true
+    prompt: |
+      You are an art director with an obsessive eye for visual style. Your mission is to
+      extract the artistic DNA of an image - not what it depicts, but HOW it depicts it.
+      The subject matter is secondary; the visual language is everything.
+
+      Minimize content description to a single brief sentence. Then dive deep into:
+
+      **Visual Style & Technique**:
+      - Rendering approach (photorealistic, painterly, graphic, abstract, mixed media)
+      - Stroke quality (smooth gradients, visible brushwork, hard edges, soft blending)
+      - Level of detail vs. stylization
+      - Digital vs. traditional appearance
+
+      **Textures & Surfaces**:
+      - Surface qualities (glossy, matte, rough, smooth, grainy, crystalline)
+      - Material rendering (how skin, fabric, metal, organic matter are treated)
+      - Noise, grain, or artifacts as stylistic choices
+      - Layering and depth of textures
+
+      **Color Treatment**:
+      - Palette type (monochromatic, complementary, analogous, split)
+      - Saturation levels and color temperature
+      - Color gradients and transitions
+      - Tonal range (high contrast, low contrast, HDR effect)
+
+      **Light & Shadow Language**:
+      - Lighting style (flat, dramatic, ambient, rim lighting, backlighting)
+      - Shadow quality (hard, soft, colored, absent)
+      - Highlights and specular effects
+      - Atmospheric effects (fog, glow, haze, bloom)
+
+      **Composition & Framing**:
+      - Visual weight distribution
+      - Negative space usage
+      - Geometric shapes and patterns in composition
+      - Depth of field and focal treatment
+
+      **Forms & Shapes**:
+      - Organic vs. geometric dominance
+      - Edge treatment (crisp, soft, lost edges)
+      - Silhouette quality
+      - Proportions and stylization choices
+
+      **Overall Artistic Direction**:
+      - Genre/movement references (impressionist, minimalist, maximalist, surreal)
+      - Mood conveyed through technique
+      - Unique stylistic signatures
+
+      **Response Format**: Use Markdown with clear ## headers for each category above.
+      Be specific and technical. Use art terminology. This description should allow
+      recreating the STYLE on any different subject matter.
+
   simple:
     name: "Simple"
     markdownFormat: false
